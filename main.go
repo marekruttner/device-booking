@@ -1,13 +1,17 @@
 package main
 
 import (
+	"database/sql"
 	"html/template"
 	"log"
 	"net/http"
 	"time"
+
+	_ "github.com/lib/pq"
 )
 
 type User struct {
+	ID       int
 	Username string
 	Password string
 }
@@ -18,13 +22,16 @@ type Device struct {
 }
 
 var (
-	users   []User
+	db      *sql.DB
 	devices []Device
 )
 
 func main() {
-	// Initialize some sample users and devices
-	initializeData()
+	// Initialize the database connection
+	initDB()
+
+	// Initialize some sample devices
+	initializeDevices()
 
 	http.HandleFunc("/", calendarHandler)
 	http.HandleFunc("/login", loginHandler)
@@ -34,18 +41,60 @@ func main() {
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
-func initializeData() {
-	// Sample users
-	users = []User{
-		{Username: "admin", Password: "password"},
-		{Username: "user", Password: "123456"},
+func initDB() {
+	// Open a database connection
+	var err error
+	db, err = sql.Open("postgres", "postgres://postgres:NvsWrkD3V@localhost/device-booking_db?sslmode=disable")
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	// Sample devices
-	devices = []Device{
-		{ID: 1, Name: "Device 1"},
-		{ID: 2, Name: "Device 2"},
-		{ID: 3, Name: "Device 3"},
+	// Create the users table if it doesn't exist
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS users (
+			id SERIAL PRIMARY KEY,
+			username TEXT NOT NULL,
+			password TEXT NOT NULL,
+			is_first_login BOOLEAN NOT NULL DEFAULT true
+		)
+	`)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Check if the default admin user exists
+	var count int
+	err = db.QueryRow("SELECT COUNT(*) FROM users WHERE username = 'admin'").Scan(&count)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// If the default admin user doesn't exist, create it
+	if count == 0 {
+		_, err = db.Exec("INSERT INTO users (username, password) VALUES ('admin', 'password')")
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	// ... Rest of the code
+}
+
+func initializeDevices() {
+	// Fetch devices from the database
+	rows, err := db.Query("SELECT id, name FROM devices")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var device Device
+		err := rows.Scan(&device.ID, &device.Name)
+		if err != nil {
+			log.Fatal(err)
+		}
+		devices = append(devices, device)
 	}
 }
 
@@ -107,9 +156,11 @@ func addUserHandler(w http.ResponseWriter, r *http.Request) {
 		username := r.FormValue("username")
 		password := r.FormValue("password")
 
-		// Add the new user
-		newUser := User{Username: username, Password: password}
-		users = append(users, newUser)
+		// Insert the new user into the database
+		_, err := db.Exec("INSERT INTO users (username, password) VALUES ($1, $2)", username, password)
+		if err != nil {
+			log.Fatal(err)
+		}
 
 		// Redirect back to the admin panel
 		http.Redirect(w, r, "/admin", http.StatusSeeOther)
@@ -128,12 +179,14 @@ func addDeviceHandler(w http.ResponseWriter, r *http.Request) {
 	} else if r.Method == "POST" {
 		deviceName := r.FormValue("devicename")
 
-		// Generate a unique ID for the new device
-		newDeviceID := len(devices) + 1
+		// Insert the new device into the database
+		_, err := db.Exec("INSERT INTO devices (name) VALUES ($1)", deviceName)
+		if err != nil {
+			log.Fatal(err)
+		}
 
-		// Add the new device
-		newDevice := Device{ID: newDeviceID, Name: deviceName}
-		devices = append(devices, newDevice)
+		// Reload devices from the database
+		initializeDevices()
 
 		// Redirect back to the admin panel
 		http.Redirect(w, r, "/admin", http.StatusSeeOther)
@@ -194,10 +247,11 @@ func setAuthenticated(w http.ResponseWriter, username string) {
 }
 
 func isValidUser(username, password string) bool {
-	for _, user := range users {
-		if user.Username == username && user.Password == password {
-			return true
-		}
+	var count int
+	err := db.QueryRow("SELECT COUNT(*) FROM users WHERE username = $1 AND password = $2", username, password).Scan(&count)
+	if err != nil {
+		log.Fatal(err)
 	}
-	return false
+
+	return count > 0
 }
