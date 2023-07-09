@@ -4,11 +4,53 @@
     <title>Calendar</title>
 </head>
 <body>
-<h1>Calendar</h1>
-<ul>
-    {{range .}}
-    <li>{{.}}</li>
+{{template "menu.html" .}}
+
+<h2>Calendar</h2>
+
+<h3>{{.CurrentMonth}}</h3>
+<table>
+    <tr>
+        <th>Sun</th>
+        <th>Mon</th>
+        <th>Tue</th>
+        <th>Wed</th>
+        <th>Thu</th>
+        <th>Fri</th>
+        <th>Sat</th>
+    </tr>
+    {{range .CalendarData}}
+    <tr>
+        {{range .Days}}
+        <td>{{.}}</td>
+        {{end}}
+    </tr>
     {{end}}
-</ul>
+</table>
+
+<h3>{{.NextMonth}}</h3>
+<table>
+    <tr>
+        <th>Sun</th>
+        <th>Mon</th>
+        <th>Tue</th>
+        <th>Wed</th>
+        <th>Thu</th>
+        <th>Fri</th>
+        <th>Sat</th>
+    </tr>
+    {{range .NextMonthData}}
+    <tr>
+        {{range .Days}}
+        <td>{{.}}</td>
+        {{end}}
+    </tr>
+    {{end}}
+</table>
+
+<h3>Device Bookings</h3>
+{{range $deviceID, $booked := (index .CalendarData 0).DeviceBooked}}
+<p>Device ID: {{$deviceID}} - Booked: {{$booked}}</p>
+{{end}}
 </body>
 </html>

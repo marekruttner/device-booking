@@ -4,11 +4,22 @@
     <title>Admin Panel</title>
 </head>
 <body>
+{{template "menu.html" .}}
 <h1>Admin Panel</h1>
 <h2>Devices</h2>
 <ul>
-    {{range .}}
-    <li>{{.Name}}</li>
+    {{range .Devices}}
+    <li>
+        {{.Name}} (Booked: {{.StartDate}} to {{.EndDate}})
+        <form action="/admin/bookdevice" method="post">
+            <input type="hidden" name="deviceid" value="{{.ID}}">
+            <label for="start-date">Start Date:</label>
+            <input type="date" name="startdate" required>
+            <label for="end-date">End Date:</label>
+            <input type="date" name="enddate" required>
+            <button type="submit">Book</button>
+        </form>
+    </li>
     {{end}}
 </ul>
 <h2>Actions</h2>

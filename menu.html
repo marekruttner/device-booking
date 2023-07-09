@@ -1,0 +1,11 @@
+{{define "menu.html"}}
+<nav>
+    <ul>
+        <li><a href="/">Home</a></li>
+        <li><a href="/login">Login</a></li>
+        {{if .IsAdmin}}
+        <li><a href="/admin">Admin Panel</a></li>
+        {{end}}
+    </ul>
+</nav>
+{{end}}
