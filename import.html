@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Device Import</title>
+</head>
+<body>
+{{template "menu.html" .}}
+
+<h1>Device Import</h1>
+
+<form method="POST" action="/admin/import" enctype="multipart/form-data">
+    <label for="csvfile">CSV File:</label>
+    <input type="file" id="csvfile" name="csvfile" required><br><br>
+    <input type="submit" value="Import">
+</form>
+
+<h2>Add Device Manually</h2>
+<form method="POST" action="/admin/adddevice">
+    <label for="devicename">Device Name:</label>
+    <input type="text" id="devicename" name="devicename" required><br><br>
+    <input type="submit" value="Add Device">
+</form>
+</body>
+</html>

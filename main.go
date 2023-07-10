@@ -2,12 +2,15 @@ package main
 
 import (
 	"database/sql"
+	"encoding/csv"
+	"github.com/gorilla/mux"
 	"html/template"
 	"log"
 	"net/http"
 	"strconv"
 	"time"
 
+	_ "github.com/gorilla/mux"
 	_ "github.com/lib/pq"
 )
 
@@ -74,15 +77,19 @@ func main() {
 	// Initialize some sample devices
 	initializeDevices()
 
-	http.HandleFunc("/", calendarHandler)
-	http.HandleFunc("/login", loginHandler)
-	http.HandleFunc("/admin", adminHandler)
-	http.HandleFunc("/admin/adduser", addUserHandler)
-	http.HandleFunc("/admin/adddevice", addDeviceHandler)
-	http.HandleFunc("/admin/bookdevice", bookDeviceHandler)
-	log.Fatal(http.ListenAndServe(":8080", nil))
-}
+	router := mux.NewRouter()
 
+	// Define the routes
+	router.HandleFunc("/", calendarHandler)
+	router.HandleFunc("/login", loginHandler)
+	router.HandleFunc("/admin", adminHandler)
+	router.HandleFunc("/admin/adduser", addUserHandler)
+	router.HandleFunc("/admin/adddevice", addDeviceHandler)
+	router.HandleFunc("/admin/bookdevice", bookDeviceHandler)
+	router.HandleFunc("/admin/import", importHandler).Methods("POST") // Use POST method for importHandler
+
+	log.Fatal(http.ListenAndServe(":8080", router))
+}
 func initDB() {
 	// Open a database connection
 	var err error
@@ -217,7 +224,63 @@ func adminHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Update the data structure for menu template
+	// Handle the import form submission
+	if r.Method == "POST" && r.URL.Path == "/admin/import" {
+		// Parse the uploaded CSV file
+		file, _, err := r.FormFile("csvfile")
+		if err != nil {
+			http.Error(w, "Failed to parse CSV file", http.StatusBadRequest)
+			return
+		}
+		defer file.Close()
+
+		// Read the CSV data
+		reader := csv.NewReader(file)
+		records, err := reader.ReadAll()
+		if err != nil {
+			http.Error(w, "Failed to read CSV data", http.StatusInternalServerError)
+			return
+		}
+
+		// Process the device records from the CSV file
+		for _, record := range records {
+			// Extract the device ID and name from the CSV record
+			deviceID := record[0]
+			deviceName := record[1]
+
+			// Modify the device ID as desired (e.g., add a prefix)
+			//modifiedDeviceID := "23A" + deviceID
+
+			// Insert the modified device into the database
+			_, err = db.Exec("INSERT INTO devices (id, name) VALUES ($1, $2)", deviceID, deviceName)
+			if err != nil {
+				http.Error(w, "Failed to insert device into the database", http.StatusInternalServerError)
+				return
+			}
+		}
+
+		// Redirect back to the admin panel
+		http.Redirect(w, r, "/admin", http.StatusSeeOther)
+		return
+	}
+
+	// Handle the manual device addition form submission
+	if r.Method == "POST" && r.URL.Path == "/admin/adddevice" {
+		deviceName := r.FormValue("devicename")
+
+		// Insert the new device into the database
+		_, err := db.Exec("INSERT INTO devices (name) VALUES ($1)", deviceName)
+		if err != nil {
+			http.Error(w, "Failed to insert device into the database", http.StatusInternalServerError)
+			return
+		}
+
+		// Redirect back to the admin panel
+		http.Redirect(w, r, "/admin", http.StatusSeeOther)
+		return
+	}
+
+	// Update the data structure for the menu template
 	menuData := struct {
 		IsAdmin  bool
 		Devices  []Device
@@ -340,6 +403,52 @@ func bookDeviceHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, "Failed to create booking", http.StatusInternalServerError)
 		return
+	}
+
+	// Redirect back to the admin panel
+	http.Redirect(w, r, "/admin", http.StatusSeeOther)
+}
+
+func importHandler(w http.ResponseWriter, r *http.Request) {
+	// Parse the multipart form data from the request
+	err := r.ParseMultipartForm(10 << 20) // Set the maximum file size to 10MB
+	if err != nil {
+		http.Error(w, "Failed to parse form data", http.StatusInternalServerError)
+		return
+	}
+
+	// Retrieve the uploaded CSV file from the form data
+	file, _, err := r.FormFile("csvfile")
+	if err != nil {
+		http.Error(w, "Failed to retrieve CSV file", http.StatusInternalServerError)
+		return
+	}
+	defer file.Close()
+
+	// Read the CSV file using a CSV reader
+	reader := csv.NewReader(file)
+
+	// Read all the records from the CSV file
+	records, err := reader.ReadAll()
+	if err != nil {
+		http.Error(w, "Failed to read CSV data", http.StatusInternalServerError)
+		return
+	}
+
+	// Process the CSV records
+	for _, record := range records {
+		deviceID := record[0]
+		deviceName := record[1]
+
+		// Modify the device ID as desired (e.g., add a prefix)
+		//modifiedDeviceID := deviceID
+
+		// Insert the modified device into the database
+		_, err = db.Exec("INSERT INTO devices (id, name) VALUES ($1, $2)", deviceID, deviceName)
+		if err != nil {
+			http.Error(w, "Failed to insert device into the database", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	// Redirect back to the admin panel
