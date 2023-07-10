@@ -10,7 +10,7 @@
 <ul>
     {{range .Devices}}
     <li>
-        {{.Name}} (Booked: {{.StartDate}} to {{.EndDate}})
+        {{.InternalID}} - {{.Name}} (Booked: {{.StartDate}} to {{.EndDate}})
         <form action="/admin/bookdevice" method="post">
             <input type="hidden" name="deviceid" value="{{.ID}}">
             <label for="start-date">Start Date:</label>

@@ -21,11 +21,12 @@ type User struct {
 }
 
 type Device struct {
-	ID        int
-	Name      string
-	StartDate time.Time
-	EndDate   time.Time
-	Bookings  []Booking
+	ID         int
+	Name       string
+	InternalID string
+	StartDate  time.Time
+	EndDate    time.Time
+	Bookings   []Booking
 }
 
 type CalendarData struct {
@@ -86,7 +87,7 @@ func main() {
 	router.HandleFunc("/admin/adduser", addUserHandler)
 	router.HandleFunc("/admin/adddevice", addDeviceHandler)
 	router.HandleFunc("/admin/bookdevice", bookDeviceHandler)
-	router.HandleFunc("/admin/import", importHandler).Methods("POST") // Use POST method for importHandler
+	router.HandleFunc("/admin/import", importHandler) // Use POST method for importHandler
 
 	log.Fatal(http.ListenAndServe(":8080", router))
 }
@@ -115,7 +116,7 @@ func initDB() {
 
 func initializeDevices() {
 	// Fetch devices from the database
-	rows, err := db.Query("SELECT id, name FROM devices")
+	rows, err := db.Query("SELECT id, name, internalid FROM devices")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -127,7 +128,7 @@ func initializeDevices() {
 
 	for rows.Next() {
 		var device Device
-		err := rows.Scan(&device.ID, &device.Name)
+		err := rows.Scan(&device.ID, &device.Name, &device.InternalID)
 		if err != nil {
 			log.Fatal(err)
 		}
